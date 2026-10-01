@@ -189,7 +189,7 @@ Tâche planifiée (`routes/console.php`) : `booking:follow-ups --slack` du lundi
 
 ## Intégration Slack
 
-Fonctionne avec un espace Slack **gratuit**.
+Fonctionne entièrement avec un espace Slack **gratuit** : Incoming Webhook, slash commands, modales et bot token sont inclus. Seule limite : 10 apps tierces ou perso par espace gratuit, et ce projet n'en utilise qu'une (les futures commandes `/date`, `/relances` iront dans la même app).
 
 ### Variables d'environnement
 
@@ -217,18 +217,43 @@ Si le webhook n'est pas renseigné, les notifications sont simplement ignorées 
 
 ### Tester en local (tunnel HTTPS)
 
-Slack doit pouvoir joindre l'app en HTTPS depuis Internet : on ouvre un tunnel (Expose) vers le site local.
+Slack doit pouvoir joindre l'app en HTTPS depuis Internet : on ouvre un tunnel vers le site local. Les deux solutions ci-dessous sont **gratuites**.
+
+#### Recommandé : ngrok (gratuit, URL fixe)
+
+Le plan gratuit de ngrok attribue à chaque compte **un domaine fixe** (`xxxx.ngrok-free.app` / `.ngrok-free.dev`) qui ne change pas tant que le compte existe : on configure Slack **une seule fois**.
+
+1. Créer un compte gratuit sur [ngrok.com](https://ngrok.com), installer ngrok, puis :
+
+   ```bash
+   ngrok config add-authtoken <token affiché dans le dashboard ngrok>
+   ```
+
+2. Relever son domaine dans le dashboard ngrok (*Domains*).
+3. Lancer le tunnel :
+
+   ```bash
+   # Herd : le site répond sous le nom punk-booking.test, il faut réécrire l'en-tête Host
+   ngrok http 80 --host-header=punk-booking.test
+
+   # Sail : l'app écoute sur le port APP_PORT (80 par défaut)
+   ngrok http 80
+   ```
+
+La page d'avertissement de ngrok gratuit ne s'affiche que pour les navigateurs : les requêtes envoyées par Slack ne sont pas concernées.
+
+#### Alternative : `herd share` / `sail share` (Expose, gratuit)
 
 ```bash
-# Herd (depuis le dossier du projet)
-herd share
-
-# Sail
-sail share                          # URL publique aléatoire
-sail share --subdomain=punk-booking # URL stable (évite de tout reconfigurer)
+herd share   # Herd, depuis le dossier du projet
+sail share   # Sail
 ```
 
-Reporter l'URL obtenue dans les étapes 6 et 7 ci-dessus, puis :
+Intégré à Herd et Sail (un compte Expose gratuit peut être demandé au premier lancement), mais en gratuit l'**URL est aléatoire à chaque lancement** et la session est limitée dans le temps : il faut recoller l'URL dans Slack (étapes 6 et 7) à chaque session de test. (Le sous-domaine fixe `--subdomain` est réservé à Expose Pro, payant.)
+
+#### Vérifier
+
+Reporter l'URL du tunnel dans les étapes 6 et 7 ci-dessus, puis :
 
 - taper `/lieu` dans Slack et valider la modale → « 📍 Nouveau lieu ajouté par … » dans le canal ;
 - passer une date à « Confirmé » dans le panel → annonce (+ alerte si un membre est indisponible) ;
@@ -359,6 +384,6 @@ Points à ne pas oublier :
 | Page d'accueil : `Vite manifest not found` | Assets non compilés : `npm install && npm run build`. |
 | `Swoole\Error: API must be called in the coroutine` | L'extension Swoole de l'image Sail déclare un `defer()` global. Toujours importer `use function Illuminate\Support\defer;`. |
 | `/lieu` répond « Impossible d'ouvrir le formulaire » | `SLACK_BOT_TOKEN` absent ou invalide, scope `commands` manquant, ou réponse trop lente (le `trigger_id` expire en 3 s). Voir `storage/logs/laravel.log`. |
-| Slack renvoie `dispatch_failed` / 401 | Mauvais `SLACK_SIGNING_SECRET`, URL du tunnel (`herd share` / `sail share`) périmée, ou horloge du serveur décalée de plus de 5 min. |
+| Slack renvoie `dispatch_failed` / 401 | Mauvais `SLACK_SIGNING_SECRET`, URL du tunnel périmée (URL `herd share` / `sail share` changée, ou ngrok arrêté), ou horloge du serveur décalée de plus de 5 min. |
 | Aucune notification dans le canal | `SLACK_BOOKING_WEBHOOK` vide, ou config en cache : `php artisan config:clear`. |
 | Le récap de 9h ne part pas | Planificateur non lancé (`php artisan schedule:work` en local, cron en prod). |
